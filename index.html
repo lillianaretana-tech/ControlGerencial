@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Control de Visitas & ARs</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Navegacion principal">
+        <div class="brand">
+          <span class="brand-mark">CV</span>
+          <div>
+            <strong>Control de Visitas</strong>
+            <small>& ARs</small>
+          </div>
+        </div>
+        <nav class="nav-list">
+          <a href="#dashboard" class="active">Dashboard</a>
+          <a href="#agenda">Agenda</a>
+          <a href="#registro">Registro</a>
+          <a href="#ars">ARs</a>
+          <a href="#reportes">Reportes</a>
+        </nav>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Supervision operativa</p>
+            <h1>Control de Visitas & ARs</h1>
+          </div>
+          <div class="topbar-actions">
+            <button class="secondary-btn" id="resetDataBtn" type="button">Restaurar demo</button>
+            <button class="primary-btn" id="exportAllBtn" type="button">Exportar CSV</button>
+          </div>
+        </header>
+
+        <section id="dashboard" class="section-block">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Mes actual</p>
+              <h2>Dashboard principal</h2>
+            </div>
+            <select id="monthFilter" aria-label="Mes del dashboard"></select>
+          </div>
+          <div class="metrics-grid" id="metricsGrid"></div>
+        </section>
+
+        <section id="agenda" class="section-block">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Planificacion</p>
+              <h2>Agenda de visitas</h2>
+            </div>
+          </div>
+          <form class="form-grid" id="visitScheduleForm">
+            <label>Fecha<input type="date" name="date" required></label>
+            <label>Dia<input type="text" name="day" readonly></label>
+            <label>Proyecto<select name="project" required></select></label>
+            <label>Ubicacion<input type="text" name="location" required></label>
+            <label>Tipo de sitio<select name="siteType" required><option>Grande</option><option>Pequeno</option></select></label>
+            <label>Frecuencia<select name="frequency" required><option>Semanal</option><option>Quincenal</option></select></label>
+            <label>Horas programadas<input type="number" name="scheduledHours" min="0" step="0.5" required></label>
+            <label>Estado<select name="status" required><option>Programada</option><option>Realizada</option><option>Reprogramada</option><option>Pendiente</option></select></label>
+            <label class="wide">Comentarios<textarea name="comments" rows="3"></textarea></label>
+            <div class="form-actions wide">
+              <button class="primary-btn" type="submit">Guardar visita</button>
+            </div>
+          </form>
+          <div class="table-tools">
+            <input id="scheduleSearch" type="search" placeholder="Buscar en agenda">
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Fecha</th><th>Proyecto</th><th>Ubicacion</th><th>Tipo</th><th>Frecuencia</th><th>Horas</th><th>Estado</th><th>Comentarios</th>
+                </tr>
+              </thead>
+              <tbody id="scheduleTable"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="registro" class="section-block">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Ejecucion</p>
+              <h2>Registro de visita</h2>
+            </div>
+          </div>
+          <form class="form-grid" id="visitRecordForm">
+            <label>Proyecto<select name="project" required></select></label>
+            <label>Fecha<input type="date" name="date" required></label>
+            <label>Hora inicio<input type="time" name="startTime" required></label>
+            <label>Hora cierre<input type="time" name="endTime" required></label>
+            <label>Auditoria de sitio<select name="siteAudit"><option>Si</option><option>No</option></select></label>
+            <label>Revision de bodega<select name="warehouseReview"><option>Si</option><option>No</option></select></label>
+            <label>Revision de capacitaciones<select name="trainingReview"><option>Si</option><option>No</option></select></label>
+            <label>Seguimiento con supervision<select name="supervisionFollowup"><option>Si</option><option>No</option></select></label>
+            <label class="wide">Hallazgos encontrados<textarea name="findings" rows="3"></textarea></label>
+            <label class="wide">Comentarios generales<textarea name="comments" rows="3"></textarea></label>
+            <div class="form-actions wide">
+              <button class="primary-btn" type="submit">Registrar visita</button>
+            </div>
+          </form>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Fecha</th><th>Proyecto</th><th>Horario</th><th>Auditoria</th><th>Bodega</th><th>Capacitaciones</th><th>Seguimiento</th><th>Hallazgos</th>
+                </tr>
+              </thead>
+              <tbody id="recordsTable"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="ars" class="section-block">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Acciones requeridas</p>
+              <h2>Modulo de ARs</h2>
+            </div>
+          </div>
+          <form class="form-grid" id="arForm">
+            <label>Proyecto<select name="project" required></select></label>
+            <label>Responsable<input type="text" name="owner" required></label>
+            <label>Fecha compromiso<input type="date" name="dueDate" required></label>
+            <label>Estado<select name="status" required><option>Abierta</option><option>En proceso</option><option>Cerrada</option><option>Vencida</option></select></label>
+            <label class="wide">Hallazgo<textarea name="finding" rows="3" required></textarea></label>
+            <label class="wide">Accion requerida<textarea name="action" rows="3" required></textarea></label>
+            <label class="wide">Comentario de cierre<textarea name="closingComment" rows="3"></textarea></label>
+            <div class="form-actions wide">
+              <button class="primary-btn" type="submit">Guardar AR</button>
+            </div>
+          </form>
+          <div class="table-tools">
+            <select id="arStatusFilter" aria-label="Filtrar ARs por estado">
+              <option value="">Todos los estados</option>
+              <option>Abierta</option>
+              <option>En proceso</option>
+              <option>Cerrada</option>
+              <option>Vencida</option>
+            </select>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Proyecto</th><th>Hallazgo</th><th>Accion</th><th>Responsable</th><th>Compromiso</th><th>Estado</th><th>Cierre</th>
+                </tr>
+              </thead>
+              <tbody id="arsTable"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="reportes" class="section-block">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Analisis</p>
+              <h2>Reportes</h2>
+            </div>
+            <button class="secondary-btn" id="exportReportBtn" type="button">Exportar reporte</button>
+          </div>
+          <div class="report-controls">
+            <label>Tipo de reporte
+              <select id="reportType">
+                <option value="monthly">Reporte mensual</option>
+                <option value="quarterly">Reporte trimestral</option>
+                <option value="project">Resumen por proyecto</option>
+                <option value="compliance">Resumen de cumplimiento</option>
+              </select>
+            </label>
+            <label>Proyecto
+              <select id="reportProject">
+                <option value="">Todos</option>
+              </select>
+            </label>
+          </div>
+          <div class="report-grid" id="reportGrid"></div>
+        </section>
+      </main>
+    </div>
+    <script src="app.js"></script>
+  </body>
+</html>
