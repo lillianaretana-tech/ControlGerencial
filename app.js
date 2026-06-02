@@ -2,6 +2,7 @@ const categories = ["Seguridad", "Inventario", "Auditoria", "Personal", "Pedidos
 const dayNames = ["Domingo", "Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado"];
 const storageKey = "control-gerencial-operativo-v2";
 const moduleVisibilityKey = "control-gerencial-module-visibility-v1";
+const sectionCollapseKey = "control-gerencial-section-collapse-v1";
 const supabaseClient = window.appSupabase?.client || null;
 const modules = [
   ["dashboard", "Dashboard"],
@@ -47,6 +48,7 @@ const els = {
   moduleVisibility: document.querySelector("#moduleVisibility"),
   scheduleSearch: document.querySelector("#scheduleSearch"),
   arStatusFilter: document.querySelector("#arStatusFilter"),
+  clearArVisitFilter: document.querySelector("#clearArVisitFilter"),
   reportType: document.querySelector("#reportType"),
   reportProject: document.querySelector("#reportProject"),
   reportGrid: document.querySelector("#reportGrid"),
@@ -55,11 +57,14 @@ const els = {
   backupBtn: document.querySelector("#backupBtn")
 };
 
+let activeArVisitFilter = "";
+
 init();
 
 async function init() {
   fillStaticOptions();
   fillMonthOptions();
+  setupCollapsibleSections();
   renderModuleVisibility();
   wireEvents();
   await loadData();
@@ -246,9 +251,72 @@ function wireEvents() {
 
   document.body.addEventListener("click", handleActionClick);
   els.moduleVisibility.addEventListener("change", handleModuleVisibilityChange);
+  els.clearArVisitFilter.addEventListener("click", () => {
+    activeArVisitFilter = "";
+    els.clearArVisitFilter.hidden = true;
+    renderArs();
+  });
   els.exportAllBtn.addEventListener("click", () => exportCsv("control-gerencial.csv", buildAllRows()));
   els.exportReportBtn.addEventListener("click", () => exportCsv("reporte-control-gerencial.csv", buildReportRows()));
   els.backupBtn.addEventListener("click", exportBackup);
+}
+
+function setupCollapsibleSections() {
+  const saved = getSectionCollapse();
+  document.querySelectorAll(".section-block").forEach((section) => {
+    const heading = section.querySelector(".section-heading");
+    if (!heading || section.querySelector(".section-content")) return;
+
+    const content = document.createElement("div");
+    content.className = "section-content";
+    const moveNodes = Array.from(section.children).filter((child) => child !== heading);
+    moveNodes.forEach((child) => content.appendChild(child));
+    section.appendChild(content);
+
+    const button = document.createElement("button");
+    button.className = "collapse-btn";
+    button.type = "button";
+    button.setAttribute("aria-label", "Abrir o cerrar modulo");
+    heading.appendChild(button);
+
+    const collapsed = saved[section.id] ?? section.id !== "dashboard";
+    setSectionCollapsed(section, collapsed);
+    heading.addEventListener("click", (event) => {
+      if (event.target.closest("select, input, button")) return;
+      toggleSection(section);
+    });
+    button.addEventListener("click", () => toggleSection(section));
+  });
+}
+
+function toggleSection(section) {
+  setSectionCollapsed(section, !section.classList.contains("collapsed"));
+  const saved = getSectionCollapse();
+  saved[section.id] = section.classList.contains("collapsed");
+  localStorage.setItem(sectionCollapseKey, JSON.stringify(saved));
+}
+
+function openSection(sectionId) {
+  const section = document.querySelector(`#${sectionId}`);
+  if (!section) return;
+  setSectionCollapsed(section, false);
+  const saved = getSectionCollapse();
+  saved[section.id] = false;
+  localStorage.setItem(sectionCollapseKey, JSON.stringify(saved));
+}
+
+function setSectionCollapsed(section, collapsed) {
+  const button = section.querySelector(".collapse-btn");
+  section.classList.toggle("collapsed", collapsed);
+  if (button) {
+    button.textContent = collapsed ? "+" : "-";
+    button.setAttribute("aria-expanded", String(!collapsed));
+  }
+}
+
+function getSectionCollapse() {
+  const saved = localStorage.getItem(sectionCollapseKey);
+  return saved ? JSON.parse(saved) : {};
 }
 
 function wireCrudForm(form, table) {
@@ -344,6 +412,50 @@ function handleActionClick(event) {
   if (action === "delete") deleteRecord(table, id);
   if (action === "toggle-tool") toggleTool(id);
   if (action === "open-tool" && url) window.open(url, "_blank", "noopener");
+  if (action === "register-visit") startVisitRecord(id);
+  if (action === "create-visit-ar") startVisitAr(id);
+  if (action === "view-visit-ars") viewVisitArs(id);
+  if (action === "mark-realized") markVisitRealized(id);
+}
+
+function startVisitRecord(visitId) {
+  const visit = state.scheduled_visits.find((item) => item.id === visitId);
+  if (!visit) return;
+  els.recordForm.reset();
+  els.recordForm.scheduled_visit_id.value = visit.id;
+  els.recordForm.project_id.value = visit.project_id;
+  els.recordForm.date.value = visit.date || "";
+  els.recordForm.start_time.value = currentTime();
+  openSection("registro");
+  els.recordForm.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+function startVisitAr(visitId) {
+  const visit = state.scheduled_visits.find((item) => item.id === visitId);
+  if (!visit) return;
+  els.arForm.reset();
+  els.arForm.scheduled_visit_id.value = visit.id;
+  els.arForm.project_id.value = visit.project_id;
+  els.arForm.source.value = "Visita programada";
+  els.arForm.finding_date.value = visit.date || toInputDate(new Date());
+  openSection("ars");
+  els.arForm.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+function viewVisitArs(visitId) {
+  activeArVisitFilter = visitId;
+  els.clearArVisitFilter.hidden = false;
+  openSection("ars");
+  renderArs();
+  document.querySelector("#ars").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+async function markVisitRealized(visitId) {
+  const visit = state.scheduled_visits.find((item) => item.id === visitId);
+  if (!visit) return;
+  visit.status = "Realizada";
+  await upsertRecord("scheduled_visits", visit);
+  renderAll();
 }
 
 function renderAll() {
@@ -514,7 +626,7 @@ function renderSchedule() {
         <td>${visit.scheduled_hours || 0}</td>
         <td>${statusPill(visit.status)}</td>
         <td>${escapeHtml(visit.comments || "")}</td>
-        <td>${rowActions("scheduled_visits", visit.id)}</td>
+        <td>${scheduleActions(visit.id)}</td>
       </tr>
     `;
   }).join("");
@@ -540,7 +652,7 @@ function renderRecords() {
 function renderArs() {
   const filter = els.arStatusFilter.value;
   els.arsTable.innerHTML = state.ars
-    .filter((ar) => !filter || ar.status === filter)
+    .filter((ar) => (!filter || ar.status === filter) && (!activeArVisitFilter || ar.scheduled_visit_id === activeArVisitFilter))
     .sort((a, b) => String(a.due_date).localeCompare(String(b.due_date)))
     .map((ar) => `
       <tr>
@@ -584,7 +696,22 @@ function renderReports() {
       <strong>${escapeHtml(String(value))}</strong>
       <p>${escapeHtml(title)}</p>
     </article>
-  `).join("");
+    `).join("");
+}
+
+function scheduleActions(id) {
+  const relatedArs = state.ars.filter((ar) => ar.scheduled_visit_id === id).length;
+  return `
+    <div class="row-actions">
+      <button class="small-btn primary" type="button" data-action="register-visit" data-id="${id}">Registrar visita</button>
+      <button class="small-btn" type="button" data-action="create-visit-ar" data-id="${id}">Crear AR</button>
+      <button class="small-btn" type="button" data-action="view-visit-ars" data-id="${id}">Ver ARs (${relatedArs})</button>
+      <button class="small-btn" type="button" data-action="mark-realized" data-id="${id}">Marcar realizada</button>
+      <button class="small-btn" type="button" data-action="edit" data-table="scheduled_visits" data-id="${id}">Editar</button>
+      <button class="small-btn" type="button" data-action="duplicate" data-table="scheduled_visits" data-id="${id}">Duplicar</button>
+      <button class="small-btn danger" type="button" data-action="delete" data-table="scheduled_visits" data-id="${id}">Eliminar</button>
+    </div>
+  `;
 }
 
 function rowActions(table, id) {
@@ -605,6 +732,9 @@ function updateExpiredArs() {
 }
 
 function normalizeRecord(table, data) {
+  if (data.scheduled_visit_id === "") data.scheduled_visit_id = null;
+  if (data.finding_date === "") data.finding_date = null;
+  if (data.closed_at === "") data.closed_at = null;
   if (table === "projects") data.suggested_hours = Number(data.suggested_hours || 0);
   if (table === "tools") data.sort_order = Number(data.sort_order || 1);
   if (table === "scheduled_visits") {
@@ -694,6 +824,11 @@ function getHours(start, end) {
   const [startH, startM] = start.split(":").map(Number);
   const [endH, endM] = end.split(":").map(Number);
   return Math.max(0, (endH * 60 + endM - startH * 60 - startM) / 60);
+}
+
+function currentTime() {
+  const now = new Date();
+  return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
 }
 
 function formatDate(value) {

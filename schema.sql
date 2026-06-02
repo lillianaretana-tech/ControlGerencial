@@ -28,6 +28,7 @@ create table if not exists scheduled_visits (
 
 create table if not exists visit_records (
   id uuid primary key default gen_random_uuid(),
+  scheduled_visit_id uuid references scheduled_visits(id) on delete set null,
   project_id uuid references projects(id) on delete set null,
   date date not null,
   start_time time,
@@ -44,6 +45,7 @@ create table if not exists visit_records (
 
 create table if not exists ars (
   id uuid primary key default gen_random_uuid(),
+  scheduled_visit_id uuid references scheduled_visits(id) on delete set null,
   project_id uuid references projects(id) on delete set null,
   source text,
   finding_date date,
@@ -93,6 +95,9 @@ create table if not exists recycle_bin (
   deleted_at timestamptz default now(),
   restore_until timestamptz default now() + interval '30 days'
 );
+
+alter table visit_records add column if not exists scheduled_visit_id uuid references scheduled_visits(id) on delete set null;
+alter table ars add column if not exists scheduled_visit_id uuid references scheduled_visits(id) on delete set null;
 
 alter table projects enable row level security;
 alter table scheduled_visits enable row level security;

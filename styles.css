@@ -111,6 +111,10 @@ textarea {
   gap: 16px;
 }
 
+.section-heading {
+  cursor: pointer;
+}
+
 h1,
 h2,
 p {
@@ -135,6 +139,28 @@ h2 {
   border: 1px solid var(--line);
   border-radius: 8px;
   box-shadow: var(--shadow);
+}
+
+.section-content {
+  margin-top: 18px;
+}
+
+.section-block.collapsed .section-content {
+  display: none;
+}
+
+.collapse-btn {
+  display: grid;
+  place-items: center;
+  flex: 0 0 38px;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #101823;
+  color: var(--ink);
+  cursor: pointer;
+  font-weight: 800;
 }
 
 .metrics-grid {

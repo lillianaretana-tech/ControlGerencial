@@ -185,6 +185,7 @@
           </div>
           <form class="form-grid" id="visitRecordForm">
             <input type="hidden" name="id">
+            <input type="hidden" name="scheduled_visit_id">
             <label>Proyecto<select name="project_id" required></select></label>
             <label>Fecha<input type="date" name="date" required></label>
             <label>Hora inicio<input type="time" name="start_time" required></label>
@@ -221,6 +222,7 @@
           </div>
           <form class="form-grid" id="arForm">
             <input type="hidden" name="id">
+            <input type="hidden" name="scheduled_visit_id">
             <label>Proyecto<select name="project_id" required></select></label>
             <label>Fuente<input name="source" placeholder="Visita, auditoria, bodega..."></label>
             <label>Fecha hallazgo<input type="date" name="finding_date"></label>
@@ -245,6 +247,7 @@
               <option>Cerrada</option>
               <option>Vencida</option>
             </select>
+            <button class="secondary-btn" id="clearArVisitFilter" type="button" hidden>Ver todos los ARs</button>
           </div>
           <div class="table-wrap">
             <table>
