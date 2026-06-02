@@ -610,6 +610,23 @@ th {
   display: none;
 }
 
+.import-panel {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr auto;
+  align-items: end;
+  gap: 14px;
+  margin: 14px 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #111923;
+}
+
+.import-panel h3 {
+  margin: 4px 0 0;
+  font-size: 17px;
+}
+
 @media (max-width: 1050px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -626,6 +643,7 @@ th {
 
   .metrics-grid,
   .form-grid,
+  .import-panel,
   .charts-grid,
   .report-grid,
   .tool-dashboard,
@@ -654,6 +672,7 @@ th {
 
   .metrics-grid,
   .form-grid,
+  .import-panel,
   .charts-grid,
   .report-grid,
   .tool-dashboard,

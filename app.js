@@ -54,6 +54,9 @@ const els = {
   saveFeedback: document.querySelector("#saveFeedback"),
   arStatusFilter: document.querySelector("#arStatusFilter"),
   clearArVisitFilter: document.querySelector("#clearArVisitFilter"),
+  importArProject: document.querySelector("#importArProject"),
+  importArFile: document.querySelector("#importArFile"),
+  importArBtn: document.querySelector("#importArBtn"),
   reportType: document.querySelector("#reportType"),
   reportProject: document.querySelector("#reportProject"),
   reportCharts: document.querySelector("#reportCharts"),
@@ -264,6 +267,7 @@ function wireEvents() {
     els.clearArVisitFilter.hidden = true;
     renderArs();
   });
+  els.importArBtn.addEventListener("click", importArsFromFile);
   els.clearScheduleFilters.addEventListener("click", () => {
     els.scheduleSearch.value = "";
     els.scheduleDateFilter.value = "";
@@ -522,6 +526,9 @@ function fillProjectOptions() {
   const currentReport = els.reportProject.value;
   els.reportProject.innerHTML = `<option value="">Todos</option>${options}`;
   els.reportProject.value = currentReport;
+  const currentImport = els.importArProject.value;
+  els.importArProject.innerHTML = options;
+  els.importArProject.value = currentImport;
 }
 
 function renderMetrics() {
@@ -1218,6 +1225,123 @@ function getHours(start, end) {
 function currentTime() {
   const now = new Date();
   return `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+}
+
+async function importArsFromFile() {
+  const file = els.importArFile.files?.[0];
+  const projectId = els.importArProject.value;
+  if (!file) {
+    alert("Selecciona un archivo Excel o CSV.");
+    return;
+  }
+  if (!projectId) {
+    alert("Selecciona el proyecto al que pertenecen los ARs.");
+    return;
+  }
+  if (!window.XLSX) {
+    alert("No se pudo cargar el lector de Excel. Como respaldo, guarda el archivo como CSV e intenta de nuevo.");
+    return;
+  }
+
+  try {
+    const buffer = await file.arrayBuffer();
+    const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, { defval: "", raw: false });
+    const imported = [];
+
+    rows.forEach((row) => {
+      const normalized = normalizeImportRow(row);
+      const finding = pickValue(normalized, ["hallazgo", "finding", "observacion", "descripcion", "description", "issue"]);
+      const action = pickValue(normalized, ["accion requerida", "accion", "action required", "required action", "action", "corrective action"]);
+      if (!finding && !action) return;
+
+      imported.push(withId({
+        project_id: projectId,
+        scheduled_visit_id: null,
+        source: pickValue(normalized, ["fuente", "source"]) || "Importado desde Excel",
+        finding_date: normalizeDate(pickValue(normalized, ["fecha hallazgo", "finding date", "fecha", "date"])) || null,
+        finding: finding || "Sin hallazgo indicado",
+        required_action: action || "Sin accion indicada",
+        owner: pickValue(normalized, ["responsable", "owner", "assigned to", "asignado"]) || "",
+        priority: normalizePriority(pickValue(normalized, ["prioridad", "priority"])) || "Media",
+        due_date: normalizeDate(pickValue(normalized, ["fecha compromiso", "due date", "compromiso", "fecha limite", "deadline"])) || null,
+        status: normalizeArStatus(pickValue(normalized, ["estado", "status"])) || "Abierta",
+        closing_comment: pickValue(normalized, ["comentario de cierre", "closing comment", "cierre"]) || "",
+        closed_at: null,
+        evidence_url: pickValue(normalized, ["evidencia", "evidence", "evidence url", "url"]) || ""
+      }));
+    });
+
+    if (!imported.length) {
+      alert("No encontre filas importables. Revisa que el archivo tenga encabezados y columnas de hallazgo/accion.");
+      return;
+    }
+
+    if (!confirm(`Se importaran ${imported.length} ARs para ${projectName(projectId)}. Deseas continuar?`)) return;
+
+    state.ars.push(...imported);
+    if (supabaseClient) {
+      const { error } = await supabaseClient.from("ars").insert(stripMeta(imported));
+      if (error) throw error;
+    }
+    saveLocal();
+    els.importArFile.value = "";
+    showSaved("ars");
+    openSection("ars");
+    renderAll();
+    alert(`Importacion lista: ${imported.length} ARs agregados.`);
+  } catch (error) {
+    alert(`No se pudo importar el archivo: ${error.message}`);
+  }
+}
+
+function normalizeImportRow(row) {
+  return Object.fromEntries(Object.entries(row).map(([key, value]) => [normalizeKey(key), value]));
+}
+
+function normalizeKey(value) {
+  return String(value)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function pickValue(row, keys) {
+  for (const key of keys) {
+    const value = row[normalizeKey(key)];
+    if (value !== undefined && value !== null && String(value).trim() !== "") return String(value).trim();
+  }
+  return "";
+}
+
+function normalizeDate(value) {
+  if (!value) return "";
+  const asDate = new Date(value);
+  if (!Number.isNaN(asDate.getTime())) return toInputDate(asDate);
+  const parts = String(value).match(/(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})/);
+  if (!parts) return "";
+  const year = parts[3].length === 2 ? `20${parts[3]}` : parts[3];
+  return `${year}-${String(parts[2]).padStart(2, "0")}-${String(parts[1]).padStart(2, "0")}`;
+}
+
+function normalizePriority(value) {
+  const text = normalizeKey(value);
+  if (text.includes("alta") || text.includes("high")) return "Alta";
+  if (text.includes("baja") || text.includes("low")) return "Baja";
+  if (text.includes("media") || text.includes("medium")) return "Media";
+  return "";
+}
+
+function normalizeArStatus(value) {
+  const text = normalizeKey(value);
+  if (text.includes("cerr")) return "Cerrada";
+  if (text.includes("venc") || text.includes("overdue")) return "Vencida";
+  if (text.includes("proceso") || text.includes("progress")) return "En proceso";
+  if (text.includes("abier") || text.includes("open")) return "Abierta";
+  return "";
 }
 
 function formatDate(value) {

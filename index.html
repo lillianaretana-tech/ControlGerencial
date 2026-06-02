@@ -260,6 +260,19 @@
             </select>
             <button class="secondary-btn" id="clearArVisitFilter" type="button" hidden>Ver todos los ARs</button>
           </div>
+          <div class="import-panel">
+            <div>
+              <p class="eyebrow">Importacion rapida</p>
+              <h3>Subir ARs desde Excel</h3>
+            </div>
+            <label>Proyecto
+              <select id="importArProject"></select>
+            </label>
+            <label>Archivo Excel o CSV
+              <input id="importArFile" type="file" accept=".xls,.xlsx,.csv">
+            </label>
+            <button class="secondary-btn" id="importArBtn" type="button">Importar ARs</button>
+          </div>
           <div class="table-wrap">
             <table>
               <thead>
