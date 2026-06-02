@@ -440,6 +440,31 @@ th {
   color: var(--muted);
 }
 
+.module-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(180px, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.module-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: #111923;
+  color: var(--ink);
+}
+
+.module-toggle input {
+  width: 20px;
+  min-height: 20px;
+  accent-color: var(--accent);
+}
+
 @media (max-width: 1050px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -458,7 +483,8 @@ th {
   .form-grid,
   .report-grid,
   .tool-dashboard,
-  .tools-grid {
+  .tools-grid,
+  .module-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
@@ -484,7 +510,8 @@ th {
   .form-grid,
   .report-grid,
   .tool-dashboard,
-  .tools-grid {
+  .tools-grid,
+  .module-grid {
     grid-template-columns: 1fr;
   }
 

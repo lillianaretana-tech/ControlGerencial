@@ -18,6 +18,7 @@
         </div>
         <nav class="nav-list">
           <a href="#dashboard" class="active">Dashboard</a>
+          <a href="#vista">Vista</a>
           <a href="#herramientas">Herramientas</a>
           <a href="#proyectos">Proyectos</a>
           <a href="#agenda">Agenda</a>
@@ -51,6 +52,16 @@
           <div class="metrics-grid" id="metricsGrid"></div>
         </section>
 
+        <section id="vista" class="section-block">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Preferencias</p>
+              <h2>Modulos visibles</h2>
+            </div>
+          </div>
+          <div class="module-grid" id="moduleVisibility"></div>
+        </section>
+
         <section id="herramientas" class="section-block">
           <div class="section-heading">
             <div>
@@ -79,6 +90,11 @@
           <div class="table-tools">
             <input id="toolSearch" type="search" placeholder="Buscar herramienta">
             <select id="toolCategoryFilter" aria-label="Filtrar por categoria"></select>
+            <select id="toolStatusFilter" aria-label="Filtrar por estado">
+              <option value="">Todas</option>
+              <option>Activa</option>
+              <option>Inactiva</option>
+            </select>
             <select id="toolSort" aria-label="Ordenar herramientas">
               <option value="sort_order">Uso frecuente</option>
               <option value="category">Categoria</option>

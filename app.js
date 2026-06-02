@@ -1,7 +1,18 @@
 const categories = ["Seguridad", "Inventario", "Auditoria", "Personal", "Pedidos", "Reportes", "Capacitacion", "Operaciones"];
 const dayNames = ["Domingo", "Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado"];
 const storageKey = "control-gerencial-operativo-v2";
+const moduleVisibilityKey = "control-gerencial-module-visibility-v1";
 const supabaseClient = window.appSupabase?.client || null;
+const modules = [
+  ["dashboard", "Dashboard"],
+  ["vista", "Vista"],
+  ["herramientas", "Centro de Herramientas"],
+  ["proyectos", "Administrar Proyectos"],
+  ["agenda", "Agenda"],
+  ["registro", "Registro"],
+  ["ars", "ARs"],
+  ["reportes", "Reportes"]
+];
 
 const state = {
   projects: [],
@@ -31,7 +42,9 @@ const els = {
   projectSearch: document.querySelector("#projectSearch"),
   toolSearch: document.querySelector("#toolSearch"),
   toolCategoryFilter: document.querySelector("#toolCategoryFilter"),
+  toolStatusFilter: document.querySelector("#toolStatusFilter"),
   toolSort: document.querySelector("#toolSort"),
+  moduleVisibility: document.querySelector("#moduleVisibility"),
   scheduleSearch: document.querySelector("#scheduleSearch"),
   arStatusFilter: document.querySelector("#arStatusFilter"),
   reportType: document.querySelector("#reportType"),
@@ -47,6 +60,7 @@ init();
 async function init() {
   fillStaticOptions();
   fillMonthOptions();
+  renderModuleVisibility();
   wireEvents();
   await loadData();
   renderAll();
@@ -55,6 +69,7 @@ async function init() {
 async function loadData() {
   if (supabaseClient) {
     els.syncStatus.textContent = "Supabase conectado";
+    els.syncStatus.title = "Los datos se leen y guardan en Supabase.";
     els.syncStatus.classList.add("online");
     try {
       for (const table of Object.keys(state)) {
@@ -63,6 +78,10 @@ async function loadData() {
         state[table] = data || [];
       }
       if (!state.projects.length) await seedInitialData(true);
+      if (state.projects.length && !state.tools.length) {
+        state.tools = defaultTools();
+        await supabaseClient.from("tools").insert(stripMeta(state.tools));
+      }
       return;
     } catch (error) {
       alert(`Supabase no respondio. Se usara respaldo local temporal. Detalle: ${error.message}`);
@@ -70,6 +89,7 @@ async function loadData() {
   }
 
   els.syncStatus.textContent = "Modo local";
+  els.syncStatus.title = "Los datos se guardan solo en este navegador.";
   const saved = localStorage.getItem(storageKey);
   if (saved) {
     Object.assign(state, JSON.parse(saved));
@@ -90,19 +110,7 @@ async function seedInitialData(saveRemote) {
     { name: "Uber Bambu", location: "Hatillo", site_type: "Pequeno", frequency: "Quincenal", suggested_hours: 2, client: "Uber", status: "Activo", comments: "" }
   ].map(withId);
 
-  const seedTools = [
-    ["Good Catch", "Seguridad", "", "Registro y seguimiento de observaciones preventivas", "Operaciones", "Activa", "Interna", "GC", 1],
-    ["Inventario", "Inventario", "", "Consulta y control de inventario operativo", "Bodega", "Activa", "Interna", "IN", 2],
-    ["Auditorias", "Auditoria", "", "Acceso a auditorias y listas de verificacion", "Calidad", "Activa", "Interna", "AU", 3],
-    ["Vacaciones", "Personal", "", "Control de vacaciones y ausencias", "RRHH", "Activa", "Externa", "VA", 4],
-    ["Pedido Mensual", "Pedidos", "", "Solicitud y seguimiento de pedidos recurrentes", "Administracion", "Activa", "Interna", "PM", 5],
-    ["Control de Visitas & ARs", "Operaciones", "", "Gestion de visitas y acciones requeridas", "Supervision", "Activa", "Interna", "CV", 6],
-    ["Reportes", "Reportes", "", "Reportes operativos y gerenciales", "Gerencia", "Activa", "Interna", "RP", 7],
-    ["Capacitaciones", "Capacitacion", "", "Seguimiento de capacitaciones", "Entrenamiento", "Activa", "Interna", "CA", 8],
-    ["Ingresos Extraordinarios", "Operaciones", "", "Gestion de ingresos fuera de rutina", "Operaciones", "Activa", "Interna", "IE", 9]
-  ].map(([name, category, url, description, responsible, status, type, icon, sort_order]) =>
-    withId({ name, category, url, description, responsible, status, type, icon, sort_order, comments: "" })
-  );
+  const seedTools = defaultTools();
 
   state.projects = seedProjects;
   state.tools = seedTools;
@@ -174,6 +182,22 @@ async function seedInitialData(saveRemote) {
   saveLocal();
 }
 
+function defaultTools() {
+  return [
+    ["Good Catch", "Seguridad", "", "Registro y seguimiento de observaciones preventivas", "Operaciones", "Activa", "Interna", "GC", 1],
+    ["Inventario", "Inventario", "", "Consulta y control de inventario operativo", "Bodega", "Activa", "Interna", "IN", 2],
+    ["Auditorias", "Auditoria", "", "Acceso a auditorias y listas de verificacion", "Calidad", "Activa", "Interna", "AU", 3],
+    ["Vacaciones", "Personal", "", "Control de vacaciones y ausencias", "RRHH", "Activa", "Externa", "VA", 4],
+    ["Pedido Mensual", "Pedidos", "", "Solicitud y seguimiento de pedidos recurrentes", "Administracion", "Activa", "Interna", "PM", 5],
+    ["Control de Visitas & ARs", "Operaciones", "", "Gestion de visitas y acciones requeridas", "Supervision", "Activa", "Interna", "CV", 6],
+    ["Reportes", "Reportes", "", "Reportes operativos y gerenciales", "Gerencia", "Activa", "Interna", "RP", 7],
+    ["Capacitaciones", "Capacitacion", "", "Seguimiento de capacitaciones", "Entrenamiento", "Activa", "Interna", "CA", 8],
+    ["Ingresos Extraordinarios", "Operaciones", "", "Gestion de ingresos fuera de rutina", "Operaciones", "Activa", "Interna", "IE", 9]
+  ].map(([name, category, url, description, responsible, status, type, icon, sort_order]) =>
+    withId({ name, category, url, description, responsible, status, type, icon, sort_order, comments: "" })
+  );
+}
+
 function fillStaticOptions() {
   const categoryOptions = categories.map((item) => `<option>${item}</option>`).join("");
   document.querySelector('select[name="category"]').innerHTML = categoryOptions;
@@ -215,12 +239,13 @@ function wireEvents() {
   });
 
   ["input", "change"].forEach((eventName) => {
-    [els.monthFilter, els.projectSearch, els.toolSearch, els.toolCategoryFilter, els.toolSort, els.scheduleSearch, els.arStatusFilter, els.reportType, els.reportProject].forEach((element) => {
+    [els.monthFilter, els.projectSearch, els.toolSearch, els.toolCategoryFilter, els.toolStatusFilter, els.toolSort, els.scheduleSearch, els.arStatusFilter, els.reportType, els.reportProject].forEach((element) => {
       element.addEventListener(eventName, renderAll);
     });
   });
 
   document.body.addEventListener("click", handleActionClick);
+  els.moduleVisibility.addEventListener("change", handleModuleVisibilityChange);
   els.exportAllBtn.addEventListener("click", () => exportCsv("control-gerencial.csv", buildAllRows()));
   els.exportReportBtn.addEventListener("click", () => exportCsv("reporte-control-gerencial.csv", buildReportRows()));
   els.backupBtn.addEventListener("click", exportBackup);
@@ -324,6 +349,7 @@ function handleActionClick(event) {
 function renderAll() {
   updateExpiredArs();
   fillProjectOptions();
+  applyModuleVisibility();
   renderMetrics();
   renderTools();
   renderProjects();
@@ -376,9 +402,10 @@ function renderMetrics() {
 function renderTools() {
   const search = els.toolSearch.value.toLowerCase();
   const category = els.toolCategoryFilter.value;
+  const status = els.toolStatusFilter.value;
   const sort = els.toolSort.value;
   const rows = state.tools
-    .filter((tool) => (!category || tool.category === category) && Object.values(tool).join(" ").toLowerCase().includes(search))
+    .filter((tool) => (!category || tool.category === category) && (!status || tool.status === status) && Object.values(tool).join(" ").toLowerCase().includes(search))
     .sort((a, b) => String(a[sort] || "").localeCompare(String(b[sort] || ""), "es", { numeric: true }));
 
   const active = state.tools.filter((tool) => tool.status === "Activa").length;
@@ -415,6 +442,44 @@ function renderTools() {
       </div>
     </article>
   `).join("");
+}
+
+function renderModuleVisibility() {
+  const visibility = getModuleVisibility();
+  els.moduleVisibility.innerHTML = modules.map(([id, label]) => `
+    <label class="module-toggle">
+      <span>${escapeHtml(label)}</span>
+      <input type="checkbox" data-module-id="${id}" ${visibility[id] ? "checked" : ""} ${id === "vista" ? "disabled" : ""}>
+    </label>
+  `).join("");
+  applyModuleVisibility();
+}
+
+function handleModuleVisibilityChange(event) {
+  const input = event.target.closest("[data-module-id]");
+  if (!input) return;
+  const visibility = getModuleVisibility();
+  visibility[input.dataset.moduleId] = input.checked;
+  localStorage.setItem(moduleVisibilityKey, JSON.stringify(visibility));
+  applyModuleVisibility();
+}
+
+function getModuleVisibility() {
+  const defaults = Object.fromEntries(modules.map(([id]) => [id, true]));
+  defaults.vista = true;
+  const saved = localStorage.getItem(moduleVisibilityKey);
+  return saved ? { ...defaults, ...JSON.parse(saved), vista: true } : defaults;
+}
+
+function applyModuleVisibility() {
+  const visibility = getModuleVisibility();
+  modules.forEach(([id]) => {
+    const section = document.querySelector(`#${id}`);
+    const navLink = document.querySelector(`.nav-list a[href="#${id}"]`);
+    const visible = visibility[id] !== false;
+    if (section) section.hidden = !visible;
+    if (navLink) navLink.hidden = !visible;
+  });
 }
 
 function renderProjects() {
