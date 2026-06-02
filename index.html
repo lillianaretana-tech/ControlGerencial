@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Control Gerencial Operativo</title>
-    <link rel="stylesheet" href="styles.css?v=supabase-1">
+    <link rel="stylesheet" href="styles.css?v=reports-1">
   </head>
   <body>
     <div class="app-shell">
@@ -278,7 +278,11 @@
               <p class="eyebrow">Analisis</p>
               <h2>Reportes</h2>
             </div>
-            <button class="secondary-btn" id="exportReportBtn" type="button">Exportar reporte</button>
+            <div class="report-actions">
+              <button class="secondary-btn" id="exportReportBtn" type="button">Exportar CSV</button>
+              <button class="secondary-btn" id="exportExcelBtn" type="button">Exportar Excel</button>
+              <button class="primary-btn" id="exportPdfBtn" type="button">Exportar PDF</button>
+            </div>
           </div>
           <div class="report-controls">
             <label>Tipo de reporte
@@ -295,13 +299,17 @@
               </select>
             </label>
           </div>
+          <div class="charts-grid" id="reportCharts"></div>
           <div class="report-grid" id="reportGrid"></div>
         </section>
       </main>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="supabaseClient.js?v=supabase-1"></script>
-    <script src="app.js?v=supabase-1"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
+    <script src="supabaseClient.js?v=reports-1"></script>
+    <script src="app.js?v=reports-1"></script>
   </body>
 </html>

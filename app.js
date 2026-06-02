@@ -56,9 +56,12 @@ const els = {
   clearArVisitFilter: document.querySelector("#clearArVisitFilter"),
   reportType: document.querySelector("#reportType"),
   reportProject: document.querySelector("#reportProject"),
+  reportCharts: document.querySelector("#reportCharts"),
   reportGrid: document.querySelector("#reportGrid"),
   exportAllBtn: document.querySelector("#exportAllBtn"),
   exportReportBtn: document.querySelector("#exportReportBtn"),
+  exportExcelBtn: document.querySelector("#exportExcelBtn"),
+  exportPdfBtn: document.querySelector("#exportPdfBtn"),
   backupBtn: document.querySelector("#backupBtn")
 };
 
@@ -269,6 +272,8 @@ function wireEvents() {
   });
   els.exportAllBtn.addEventListener("click", () => exportCsv("control-gerencial.csv", buildAllRows()));
   els.exportReportBtn.addEventListener("click", () => exportCsv("reporte-control-gerencial.csv", buildReportRows()));
+  els.exportExcelBtn.addEventListener("click", exportExcelReport);
+  els.exportPdfBtn.addEventListener("click", exportPdfReport);
   els.backupBtn.addEventListener("click", exportBackup);
 }
 
@@ -725,10 +730,8 @@ function renderArs() {
 }
 
 function renderReports() {
-  const projectId = els.reportProject.value;
-  const schedule = state.scheduled_visits.filter((item) => !projectId || item.project_id === projectId);
-  const records = state.visit_records.filter((item) => !projectId || item.project_id === projectId);
-  const ars = state.ars.filter((item) => !projectId || item.project_id === projectId);
+  const report = getReportData();
+  const { projectId, schedule, records, ars } = report;
   const type = els.reportType.value;
   let cards = [];
 
@@ -753,6 +756,79 @@ function renderReports() {
       <p>${escapeHtml(title)}</p>
     </article>
     `).join("");
+  renderReportCharts(report);
+}
+
+function getReportData() {
+  const projectId = els.reportProject.value;
+  const month = els.monthFilter.value;
+  const schedule = state.scheduled_visits.filter((item) => (!projectId || item.project_id === projectId) && (!month || item.date?.startsWith(month)));
+  const records = state.visit_records.filter((item) => (!projectId || item.project_id === projectId) && (!month || item.date?.startsWith(month)));
+  const ars = state.ars.filter((item) => !projectId || item.project_id === projectId);
+  const completed = schedule.filter((visit) => visit.status === "Realizada").length;
+  const compliance = schedule.length ? Math.round((completed / schedule.length) * 100) : 0;
+  const arStatus = countBy(ars, "status");
+  const visitsByProject = state.projects.map((project) => ({
+    project: project.name,
+    planned: schedule.filter((visit) => visit.project_id === project.id).length,
+    completed: schedule.filter((visit) => visit.project_id === project.id && visit.status === "Realizada").length
+  })).filter((item) => item.planned || item.completed);
+
+  return {
+    projectId,
+    month,
+    schedule,
+    records,
+    ars,
+    completed,
+    compliance,
+    arStatus,
+    visitsByProject,
+    generatedAt: new Date()
+  };
+}
+
+function renderReportCharts(report) {
+  const arTotal = report.ars.length || 1;
+  const maxVisits = Math.max(1, ...report.visitsByProject.map((item) => item.planned));
+  els.reportCharts.innerHTML = `
+    <article class="chart-card">
+      <h3>Cumplimiento mensual</h3>
+      <div class="donut-lite" style="--pct: ${report.compliance}%"><span>${report.compliance}%</span></div>
+      ${barRow("Realizadas", report.completed, report.schedule.length || 1, "ok")}
+      ${barRow("Programadas", report.schedule.length, report.schedule.length || 1, "")}
+    </article>
+    <article class="chart-card">
+      <h3>ARs por estado</h3>
+      ${["Abierta", "En proceso", "Cerrada", "Vencida"].map((status) => {
+        const tone = status === "Cerrada" ? "ok" : status === "Vencida" ? "danger" : "warn";
+        return barRow(status, report.arStatus[status] || 0, arTotal, tone);
+      }).join("")}
+    </article>
+    <article class="chart-card">
+      <h3>Visitas por proyecto</h3>
+      ${report.visitsByProject.length ? report.visitsByProject.slice(0, 6).map((item) => barRow(item.project, item.planned, maxVisits, "")).join("") : "<p>No hay visitas en el periodo.</p>"}
+    </article>
+  `;
+}
+
+function barRow(label, value, max, tone) {
+  const pct = Math.max(0, Math.min(100, Math.round((Number(value || 0) / Number(max || 1)) * 100)));
+  return `
+    <div class="bar-row">
+      <span>${escapeHtml(label)}</span>
+      <span class="bar-track"><span class="bar-fill ${tone || ""}" style="width:${pct}%"></span></span>
+      <strong>${value}</strong>
+    </div>
+  `;
+}
+
+function countBy(rows, key) {
+  return rows.reduce((acc, row) => {
+    const value = row[key] || "Sin estado";
+    acc[value] = (acc[value] || 0) + 1;
+    return acc;
+  }, {});
 }
 
 function scheduleActions(id) {
@@ -834,6 +910,263 @@ function buildReportRows() {
     card.querySelector("p").textContent,
     card.querySelector("strong").textContent
   ])];
+}
+
+function exportExcelReport() {
+  if (!window.XLSX) {
+    exportExcelHtmlReport();
+    return;
+  }
+  const report = getReportData();
+  const workbook = XLSX.utils.book_new();
+  const title = reportTitle(report);
+
+  addSheet(workbook, "Resumen", [
+    ["Control Gerencial Operativo"],
+    [title],
+    ["Generado", report.generatedAt.toLocaleString("es-CR")],
+    [],
+    ["Indicador", "Valor"],
+    ["Visitas programadas", report.schedule.length],
+    ["Visitas realizadas", report.completed],
+    ["Cumplimiento", `${report.compliance}%`],
+    ["ARs abiertas", report.arStatus.Abierta || 0],
+    ["ARs en proceso", report.arStatus["En proceso"] || 0],
+    ["ARs cerradas", report.arStatus.Cerrada || 0],
+    ["ARs vencidas", report.arStatus.Vencida || 0]
+  ], [28, 32]);
+
+  addSheet(workbook, "Agenda", [
+    ["Fecha", "Dia", "Proyecto", "Horas", "Estado", "Comentarios"],
+    ...report.schedule.map((visit) => [visit.date, visit.day, projectName(visit.project_id), visit.scheduled_hours || 0, visit.status, visit.comments || ""])
+  ], [14, 14, 28, 10, 16, 42]);
+
+  addSheet(workbook, "Registros", [
+    ["Fecha", "Proyecto", "Inicio", "Cierre", "Auditoria", "Bodega", "Capacitaciones", "Seguimiento", "Hallazgos", "Comentarios"],
+    ...report.records.map((record) => [record.date, projectName(record.project_id), record.start_time || "", record.end_time || "", record.site_audit || "", record.warehouse_review || "", record.training_review || "", record.supervision_followup || "", record.findings || "", record.comments || ""])
+  ], [14, 28, 10, 10, 12, 12, 16, 16, 42, 42]);
+
+  addSheet(workbook, "ARs", [
+    ["Proyecto", "Fuente", "Prioridad", "Hallazgo", "Accion requerida", "Responsable", "Compromiso", "Estado", "Cierre", "Evidencia"],
+    ...report.ars.map((ar) => [projectName(ar.project_id), ar.source || "", ar.priority || "", ar.finding || "", ar.required_action || "", ar.owner || "", ar.due_date || "", ar.status || "", ar.closing_comment || "", ar.evidence_url || ""])
+  ], [28, 18, 12, 42, 42, 22, 14, 16, 34, 30]);
+
+  addSheet(workbook, "Graficos Datos", [
+    ["Grafico", "Categoria", "Valor"],
+    ["Cumplimiento", "Programadas", report.schedule.length],
+    ["Cumplimiento", "Realizadas", report.completed],
+    ...Object.entries(report.arStatus).map(([status, value]) => ["ARs por estado", status, value]),
+    ...report.visitsByProject.map((item) => ["Visitas por proyecto", item.project, item.planned])
+  ], [24, 30, 12]);
+
+  XLSX.writeFile(workbook, `${fileBaseName("reporte-control-gerencial")}.xlsx`);
+}
+
+function exportExcelHtmlReport() {
+  const report = getReportData();
+  const sections = [
+    ["Resumen", [
+      ["Indicador", "Valor"],
+      ["Visitas programadas", report.schedule.length],
+      ["Visitas realizadas", report.completed],
+      ["Cumplimiento", `${report.compliance}%`],
+      ["ARs abiertas", report.arStatus.Abierta || 0],
+      ["ARs en proceso", report.arStatus["En proceso"] || 0],
+      ["ARs cerradas", report.arStatus.Cerrada || 0],
+      ["ARs vencidas", report.arStatus.Vencida || 0]
+    ]],
+    ["Agenda", [
+      ["Fecha", "Dia", "Proyecto", "Horas", "Estado", "Comentarios"],
+      ...report.schedule.map((visit) => [visit.date, visit.day, projectName(visit.project_id), visit.scheduled_hours || 0, visit.status, visit.comments || ""])
+    ]],
+    ["ARs", [
+      ["Proyecto", "Prioridad", "Hallazgo", "Accion requerida", "Responsable", "Compromiso", "Estado"],
+      ...report.ars.map((ar) => [projectName(ar.project_id), ar.priority || "", ar.finding || "", ar.required_action || "", ar.owner || "", ar.due_date || "", ar.status || ""])
+    ]]
+  ];
+  const html = `
+    <html>
+      <head><meta charset="utf-8"></head>
+      <body>
+        <h1>Control Gerencial Operativo</h1>
+        <h2>${escapeHtml(reportTitle(report))}</h2>
+        <p>Generado: ${escapeHtml(report.generatedAt.toLocaleString("es-CR"))}</p>
+        ${sections.map(([title, rows]) => `
+          <h2>${escapeHtml(title)}</h2>
+          <table border="1">
+            ${rows.map((row, index) => `<tr>${row.map((cell) => `<${index === 0 ? "th" : "td"}>${escapeHtml(cell)}</${index === 0 ? "th" : "td"}>`).join("")}</tr>`).join("")}
+          </table>
+        `).join("")}
+      </body>
+    </html>
+  `;
+  downloadBlob(`${fileBaseName("reporte-control-gerencial")}.xls`, new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8" }));
+}
+
+function addSheet(workbook, name, rows, widths) {
+  const sheet = XLSX.utils.aoa_to_sheet(rows);
+  sheet["!cols"] = widths.map((wch) => ({ wch }));
+  XLSX.utils.book_append_sheet(workbook, sheet, name);
+}
+
+function exportPdfReport() {
+  const jsPdf = window.jspdf?.jsPDF;
+  if (!jsPdf) {
+    openPrintableReport();
+    return;
+  }
+  const report = getReportData();
+  const doc = new jsPdf({ orientation: "landscape", unit: "pt", format: "a4" });
+  const margin = 36;
+  const title = reportTitle(report);
+
+  doc.setFillColor(15, 21, 29);
+  doc.rect(0, 0, 842, 92, "F");
+  doc.setTextColor(238, 243, 248);
+  doc.setFontSize(20);
+  doc.text("Control Gerencial Operativo", margin, 42);
+  doc.setFontSize(11);
+  doc.text(title, margin, 64);
+  doc.text(`Generado: ${report.generatedAt.toLocaleString("es-CR")}`, margin, 80);
+
+  doc.setTextColor(28, 39, 51);
+  drawPdfMetricCards(doc, report, margin, 116);
+  drawPdfBars(doc, report, margin, 220);
+
+  doc.autoTable({
+    startY: 372,
+    head: [["Fecha", "Proyecto", "Horas", "Estado", "Comentarios"]],
+    body: report.schedule.map((visit) => [formatDate(visit.date), projectName(visit.project_id), visit.scheduled_hours || 0, visit.status, visit.comments || ""]),
+    styles: { fontSize: 8, cellPadding: 5 },
+    headStyles: { fillColor: [35, 100, 170] },
+    margin: { left: margin, right: margin }
+  });
+
+  doc.addPage();
+  doc.setFontSize(15);
+  doc.text("Acciones requeridas", margin, 42);
+  doc.autoTable({
+    startY: 58,
+    head: [["Proyecto", "Prioridad", "Hallazgo", "Accion", "Responsable", "Compromiso", "Estado"]],
+    body: report.ars.map((ar) => [projectName(ar.project_id), ar.priority || "", ar.finding || "", ar.required_action || "", ar.owner || "", formatDate(ar.due_date), ar.status || ""]),
+    styles: { fontSize: 8, cellPadding: 5 },
+    headStyles: { fillColor: [35, 100, 170] },
+    margin: { left: margin, right: margin }
+  });
+
+  doc.save(`${fileBaseName("reporte-control-gerencial")}.pdf`);
+}
+
+function openPrintableReport() {
+  const report = getReportData();
+  const html = `
+    <!doctype html>
+    <html lang="es">
+      <head>
+        <meta charset="utf-8">
+        <title>${escapeHtml(reportTitle(report))}</title>
+        <style>
+          body { font-family: Arial, sans-serif; color: #1c2733; margin: 32px; }
+          header { border-bottom: 3px solid #2364aa; margin-bottom: 22px; padding-bottom: 14px; }
+          h1 { margin: 0 0 6px; }
+          .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 18px 0; }
+          .card { border: 1px solid #dbe2ea; border-radius: 8px; padding: 12px; }
+          .card strong { display: block; font-size: 24px; margin-top: 6px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 12px; }
+          th, td { border: 1px solid #dbe2ea; padding: 7px; text-align: left; vertical-align: top; }
+          th { background: #2364aa; color: white; }
+          .bar { height: 10px; background: #dbe2ea; border-radius: 999px; overflow: hidden; }
+          .fill { height: 100%; background: #2d7a46; width: ${report.compliance}%; }
+          @media print { body { margin: 18px; } }
+        </style>
+      </head>
+      <body>
+        <header>
+          <h1>Control Gerencial Operativo</h1>
+          <div>${escapeHtml(reportTitle(report))}</div>
+          <div>Generado: ${escapeHtml(report.generatedAt.toLocaleString("es-CR"))}</div>
+        </header>
+        <section class="cards">
+          <div class="card">Programadas<strong>${report.schedule.length}</strong></div>
+          <div class="card">Realizadas<strong>${report.completed}</strong></div>
+          <div class="card">Cumplimiento<strong>${report.compliance}%</strong></div>
+          <div class="card">ARs vencidas<strong>${report.arStatus.Vencida || 0}</strong></div>
+        </section>
+        <h2>Cumplimiento</h2>
+        <div class="bar"><div class="fill"></div></div>
+        <h2>Agenda</h2>
+        <table>
+          <thead><tr><th>Fecha</th><th>Proyecto</th><th>Horas</th><th>Estado</th><th>Comentarios</th></tr></thead>
+          <tbody>${report.schedule.map((visit) => `<tr><td>${formatDate(visit.date)}</td><td>${escapeHtml(projectName(visit.project_id))}</td><td>${visit.scheduled_hours || 0}</td><td>${escapeHtml(visit.status)}</td><td>${escapeHtml(visit.comments || "")}</td></tr>`).join("")}</tbody>
+        </table>
+        <h2>ARs</h2>
+        <table>
+          <thead><tr><th>Proyecto</th><th>Prioridad</th><th>Hallazgo</th><th>Accion</th><th>Responsable</th><th>Compromiso</th><th>Estado</th></tr></thead>
+          <tbody>${report.ars.map((ar) => `<tr><td>${escapeHtml(projectName(ar.project_id))}</td><td>${escapeHtml(ar.priority || "")}</td><td>${escapeHtml(ar.finding || "")}</td><td>${escapeHtml(ar.required_action || "")}</td><td>${escapeHtml(ar.owner || "")}</td><td>${formatDate(ar.due_date)}</td><td>${escapeHtml(ar.status || "")}</td></tr>`).join("")}</tbody>
+        </table>
+        <script>window.onload = () => window.print();</script>
+      </body>
+    </html>
+  `;
+  const reportWindow = window.open("", "_blank", "noopener");
+  if (!reportWindow) {
+    downloadBlob(`${fileBaseName("reporte-control-gerencial")}.html`, new Blob([html], { type: "text/html;charset=utf-8" }));
+    return;
+  }
+  reportWindow.document.write(html);
+  reportWindow.document.close();
+}
+
+function drawPdfMetricCards(doc, report, x, y) {
+  const cards = [
+    ["Programadas", report.schedule.length],
+    ["Realizadas", report.completed],
+    ["Cumplimiento", `${report.compliance}%`],
+    ["ARs vencidas", report.arStatus.Vencida || 0]
+  ];
+  cards.forEach(([label, value], index) => {
+    const cardX = x + index * 196;
+    doc.setFillColor(245, 247, 250);
+    doc.roundedRect(cardX, y, 176, 64, 6, 6, "F");
+    doc.setTextColor(97, 112, 131);
+    doc.setFontSize(9);
+    doc.text(label, cardX + 14, y + 22);
+    doc.setTextColor(28, 39, 51);
+    doc.setFontSize(20);
+    doc.text(String(value), cardX + 14, y + 48);
+  });
+}
+
+function drawPdfBars(doc, report, x, y) {
+  doc.setFontSize(13);
+  doc.setTextColor(28, 39, 51);
+  doc.text("Indicadores graficos", x, y);
+  const rows = [
+    ["Cumplimiento", report.compliance, 100],
+    ["ARs cerradas", report.arStatus.Cerrada || 0, Math.max(1, report.ars.length)],
+    ["ARs vencidas", report.arStatus.Vencida || 0, Math.max(1, report.ars.length)]
+  ];
+  rows.forEach(([label, value, max], index) => {
+    const rowY = y + 28 + index * 30;
+    const pct = Math.max(0, Math.min(1, Number(value) / Number(max || 1)));
+    doc.setFontSize(9);
+    doc.text(label, x, rowY);
+    doc.setFillColor(219, 226, 234);
+    doc.roundedRect(x + 120, rowY - 10, 250, 10, 5, 5, "F");
+    doc.setFillColor(index === 2 ? 208 : 79, index === 2 ? 90 : 179, index === 2 ? 90 : 109);
+    doc.roundedRect(x + 120, rowY - 10, 250 * pct, 10, 5, 5, "F");
+    doc.text(String(value), x + 386, rowY);
+  });
+}
+
+function reportTitle(report) {
+  const project = report.projectId ? projectName(report.projectId) : "Todos los proyectos";
+  const month = report.month ? els.monthFilter.options[els.monthFilter.selectedIndex].text : "Periodo actual";
+  return `${month} | ${project}`;
+}
+
+function fileBaseName(prefix) {
+  return `${prefix}-${toInputDate(new Date())}`;
 }
 
 function exportBackup() {

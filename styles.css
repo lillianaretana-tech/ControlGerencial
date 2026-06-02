@@ -336,6 +336,87 @@ th {
   min-width: 240px;
 }
 
+.report-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(240px, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.chart-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  background: #111923;
+}
+
+.chart-card h3 {
+  margin: 0 0 14px;
+  font-size: 16px;
+}
+
+.bar-row {
+  display: grid;
+  grid-template-columns: minmax(95px, 1fr) 2fr auto;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  font-size: 13px;
+}
+
+.bar-track {
+  height: 10px;
+  border-radius: 999px;
+  background: #263446;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+
+.bar-fill.ok {
+  background: var(--ok);
+}
+
+.bar-fill.warn {
+  background: #f0b65e;
+}
+
+.bar-fill.danger {
+  background: var(--danger);
+}
+
+.donut-lite {
+  width: 132px;
+  height: 132px;
+  margin: 6px auto 14px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: conic-gradient(var(--ok) var(--pct), #293648 0);
+}
+
+.donut-lite span {
+  display: grid;
+  place-items: center;
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  background: #111923;
+  font-size: 24px;
+  font-weight: 800;
+}
+
 .report-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(220px, 1fr));
@@ -545,6 +626,7 @@ th {
 
   .metrics-grid,
   .form-grid,
+  .charts-grid,
   .report-grid,
   .tool-dashboard,
   .tools-grid,
@@ -572,6 +654,7 @@ th {
 
   .metrics-grid,
   .form-grid,
+  .charts-grid,
   .report-grid,
   .tool-dashboard,
   .tools-grid,
@@ -587,6 +670,7 @@ th {
   .table-tools select,
   .section-heading select,
   .topbar-actions button,
+  .report-actions button,
   .table-tools button {
     max-width: none;
     width: 100%;
