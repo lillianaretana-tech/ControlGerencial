@@ -517,6 +517,18 @@ th {
   font-size: 13px;
 }
 
+.save-feedback {
+  min-height: 0;
+  margin: 8px 0;
+  color: var(--ok);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.save-feedback:empty {
+  display: none;
+}
+
 @media (max-width: 1050px) {
   .app-shell {
     grid-template-columns: 1fr;

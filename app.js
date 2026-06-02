@@ -51,6 +51,7 @@ const els = {
   scheduleStatusFilter: document.querySelector("#scheduleStatusFilter"),
   clearScheduleFilters: document.querySelector("#clearScheduleFilters"),
   agendaDaySummary: document.querySelector("#agendaDaySummary"),
+  saveFeedback: document.querySelector("#saveFeedback"),
   arStatusFilter: document.querySelector("#arStatusFilter"),
   clearArVisitFilter: document.querySelector("#clearArVisitFilter"),
   reportType: document.querySelector("#reportType"),
@@ -337,8 +338,31 @@ function wireCrudForm(form, table) {
     normalizeRecord(table, data);
     await upsertRecord(table, data);
     form.reset();
+    clearFormIdentity(form);
+    showSaved(table);
     renderAll();
   });
+}
+
+function clearFormIdentity(form) {
+  if (form.elements.id) form.elements.id.value = "";
+  if (form.elements.scheduled_visit_id) form.elements.scheduled_visit_id.value = "";
+}
+
+function showSaved(table) {
+  const labels = {
+    projects: "Proyecto guardado.",
+    tools: "Herramienta guardada.",
+    scheduled_visits: "Visita agendada correctamente.",
+    visit_records: "Registro de visita guardado.",
+    ars: "AR guardado."
+  };
+  if (!els.saveFeedback) return;
+  els.saveFeedback.textContent = labels[table] || "Guardado.";
+  window.clearTimeout(showSaved.timer);
+  showSaved.timer = window.setTimeout(() => {
+    els.saveFeedback.textContent = "";
+  }, 2800);
 }
 
 async function upsertRecord(table, record) {
@@ -651,8 +675,9 @@ function renderSchedule() {
 }
 
 function renderAgendaDaySummary(rows, dateFilter) {
+  const allCount = state.scheduled_visits.length;
   if (!dateFilter) {
-    els.agendaDaySummary.innerHTML = "";
+    els.agendaDaySummary.innerHTML = `<span class="agenda-chip"><strong>Agenda:</strong> mostrando ${rows.length} de ${allCount} visita(s)</span>`;
     return;
   }
   const totalHours = rows.reduce((total, visit) => total + Number(visit.scheduled_hours || 0), 0);
