@@ -163,7 +163,17 @@
           </form>
           <div class="table-tools">
             <input id="scheduleSearch" type="search" placeholder="Buscar en agenda">
+            <input id="scheduleDateFilter" type="date" aria-label="Filtrar agenda por fecha">
+            <select id="scheduleStatusFilter" aria-label="Filtrar agenda por estado">
+              <option value="">Todos los estados</option>
+              <option>Programada</option>
+              <option>Realizada</option>
+              <option>Reprogramada</option>
+              <option>Pendiente</option>
+            </select>
+            <button class="secondary-btn" id="clearScheduleFilters" type="button">Limpiar filtros</button>
           </div>
+          <div class="agenda-day-summary" id="agendaDaySummary"></div>
           <div class="table-wrap">
             <table>
               <thead>

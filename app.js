@@ -47,6 +47,10 @@ const els = {
   toolSort: document.querySelector("#toolSort"),
   moduleVisibility: document.querySelector("#moduleVisibility"),
   scheduleSearch: document.querySelector("#scheduleSearch"),
+  scheduleDateFilter: document.querySelector("#scheduleDateFilter"),
+  scheduleStatusFilter: document.querySelector("#scheduleStatusFilter"),
+  clearScheduleFilters: document.querySelector("#clearScheduleFilters"),
+  agendaDaySummary: document.querySelector("#agendaDaySummary"),
   arStatusFilter: document.querySelector("#arStatusFilter"),
   clearArVisitFilter: document.querySelector("#clearArVisitFilter"),
   reportType: document.querySelector("#reportType"),
@@ -244,7 +248,7 @@ function wireEvents() {
   });
 
   ["input", "change"].forEach((eventName) => {
-    [els.monthFilter, els.projectSearch, els.toolSearch, els.toolCategoryFilter, els.toolStatusFilter, els.toolSort, els.scheduleSearch, els.arStatusFilter, els.reportType, els.reportProject].forEach((element) => {
+    [els.monthFilter, els.projectSearch, els.toolSearch, els.toolCategoryFilter, els.toolStatusFilter, els.toolSort, els.scheduleSearch, els.scheduleDateFilter, els.scheduleStatusFilter, els.arStatusFilter, els.reportType, els.reportProject].forEach((element) => {
       element.addEventListener(eventName, renderAll);
     });
   });
@@ -255,6 +259,12 @@ function wireEvents() {
     activeArVisitFilter = "";
     els.clearArVisitFilter.hidden = true;
     renderArs();
+  });
+  els.clearScheduleFilters.addEventListener("click", () => {
+    els.scheduleSearch.value = "";
+    els.scheduleDateFilter.value = "";
+    els.scheduleStatusFilter.value = "";
+    renderSchedule();
   });
   els.exportAllBtn.addEventListener("click", () => exportCsv("control-gerencial.csv", buildAllRows()));
   els.exportReportBtn.addEventListener("click", () => exportCsv("reporte-control-gerencial.csv", buildReportRows()));
@@ -613,9 +623,17 @@ function renderProjects() {
 
 function renderSchedule() {
   const search = els.scheduleSearch.value.toLowerCase();
+  const dateFilter = els.scheduleDateFilter.value;
+  const statusFilter = els.scheduleStatusFilter.value;
   const rows = state.scheduled_visits
-    .filter((visit) => `${projectName(visit.project_id)} ${Object.values(visit).join(" ")}`.toLowerCase().includes(search))
+    .filter((visit) => {
+      const matchesText = `${projectName(visit.project_id)} ${Object.values(visit).join(" ")}`.toLowerCase().includes(search);
+      const matchesDate = !dateFilter || visit.date === dateFilter;
+      const matchesStatus = !statusFilter || visit.status === statusFilter;
+      return matchesText && matchesDate && matchesStatus;
+    })
     .sort((a, b) => String(a.date).localeCompare(String(b.date)));
+  renderAgendaDaySummary(rows, dateFilter);
   els.scheduleTable.innerHTML = rows.map((visit) => {
     const project = getProject(visit.project_id);
     return `
@@ -630,6 +648,19 @@ function renderSchedule() {
       </tr>
     `;
   }).join("");
+}
+
+function renderAgendaDaySummary(rows, dateFilter) {
+  if (!dateFilter) {
+    els.agendaDaySummary.innerHTML = "";
+    return;
+  }
+  const totalHours = rows.reduce((total, visit) => total + Number(visit.scheduled_hours || 0), 0);
+  const projects = rows.map((visit) => projectName(visit.project_id)).join(", ");
+  els.agendaDaySummary.innerHTML = `
+    <span class="agenda-chip"><strong>${formatDate(dateFilter)}</strong>: ${rows.length} visita(s), ${totalHours} hora(s)</span>
+    <span>${escapeHtml(projects || "No hay visitas para esta fecha.")}</span>
+  `;
 }
 
 function renderRecords() {
